@@ -14,17 +14,5 @@ t2 = inputs['attention_mask']
 
 
 module = torch.jit.trace(model, t1)
+state_dict = module.state_dict()
 graph = module.graph.copy()
-
-def parse(graph):
-    for n in graph.nodes():
-        #print(n.scopeName(), n.kind())
-        attrs = str({k: k for k in n.attributeNames()})
-        #print("attrs", attrs)
-        inputs = [i for i in n.inputs()]
-        #print("inputs", inputs)
-        outputs = [i  for i in n.outputs()]
-        #print("outputs", outputs)
-        #print('---------------\n\n')
-
-    return (attrs, inputs, outputs)
