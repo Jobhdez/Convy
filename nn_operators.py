@@ -1,7 +1,10 @@
 import torch as nn
 import torch 
 
-### Batchnorm, taken from here
+"""
+these functions were taken from here http://d2l.ai/chapter_convolutional-neural-networks/conv-layer.html
+and here https://d2l.ai/chapter_convolutional-modern/batch-norm.html
+"""
 def batch_norm(X, gamma, beta, moving_mean, moving_var, eps, momentum):
     # Use is_grad_enabled to determine whether we are in training mode
     if not torch.is_grad_enabled():
@@ -39,8 +42,6 @@ def corr2d(X, K):  #@save
     return Y
 
 def conv2d(input_tensor, weight, bias):
-    
-
 
     corr = corr2d(input_tensor, weight)
     return corr + bias
