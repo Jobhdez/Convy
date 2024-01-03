@@ -2,6 +2,11 @@ import torch
 import torch.nn as nn
 from compiler import  get_node_inputs
 
+import torch
+import torch.nn as nn
+from torch.nn import functional as F
+from torch.jit.annotations import Optional
+
 class VGG16Block(nn.Module):
     def __init__(self):
         super(VGG16Block, self).__init__()
@@ -25,6 +30,8 @@ width = 224
 example_input = torch.randn(batch_size, channels, height, width)
 
 module = torch.jit.trace(net, example_input)
+
+# Rest of your code...
 
 state_dict = module.state_dict()
 
@@ -71,9 +78,7 @@ def batch_norm(X, gamma, beta, moving_mean, moving_var, eps, momentum):
     Y = gamma * X_hat + beta  # Scale and shift
     return Y, moving_mean.data, moving_var.data
 
-def conv2d(input_tensor, weight, bias):
-    
-   def corr2d(X, K):  #@save
+def corr2d(X, K):  #@save
     """Compute 2D cross-correlation."""
     h, w = K.shape
     Y = torch.zeros((X.shape[0] - h + 1, X.shape[1] - w + 1))
@@ -81,6 +86,9 @@ def conv2d(input_tensor, weight, bias):
         for j in range(Y.shape[1]):
             Y[i, j] = (X[i:i + h, j:j + w] * K).sum()
     return Y
+
+def conv2d(input_tensor, weight, bias):
+    
 
 
     corr = corr2d(input_tensor, weight)
@@ -100,15 +108,16 @@ input_tensor = torch.randn(batch_size, channels, height, width)
 input_tensor_2d = input_tensor.view(batch_size, channels, -1)
 in_channels = channels
 out_channels = 64
-kernel_size = 3
+kernel_size = (3, 3)
 
 # Initialize weight tensor
 weight = nn.Parameter(torch.rand(kernel_size))
 bias = nn.Parameter(torch.zeros(1))
 inp = torch.tensor([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0], [6.0, 7.0, 8.0]])
 
-x = conv2d(inp, weight, bias) 
+x = conv2d(inp, weight, bias)
 print(x)
+
 shape = (1, 64, 1, 1)
 gamma = nn.Parameter(torch.ones(shape))
 beta = nn.Parameter(torch.zeros(shape))
@@ -120,11 +129,12 @@ x, _, _ = batch_norm(x, gamma, beta,
                              moving_mean, moving_var,
                             eps=1e-5, momentum=0.1)
 x = rectified(x)
-
+print(x)
 savm = module.save("test25.pth")
 loadm = torch.jit.load("test25.pth")
 
 with torch.no_grad():
+    inp = inp.view(1,3,3,1)
     torch_output = loadm(inp)
 
 print(f'torch output: {torch_output} \n\n myoutput: {x}')
