@@ -27,6 +27,8 @@ def compile(module):
                 return BatchNorm2d()
             elif 'reLU' in inp.type().str():
                 return Relu()
+            else:
+                break
 
 class Relu:
     pass
