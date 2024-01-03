@@ -154,17 +154,33 @@ x, _, _ = batch_norm(x, gamma, beta,
                             eps=1e-5, momentum=0.1)
 x = rectified(x)
 """
-x = convolution_torch(ones_pytorch, conv_weights, conv_biases)
+
+def batch_norm2d(input_data, gamma, beta, epsilon=1e-5):
+    # Calculate mean and variance along batch and spatial dimensions
+    mean = torch.mean(input_data, dim=(0, 2, 3), keepdim=True)
+    var = torch.var(input_data, dim=(0, 2, 3), unbiased=False, keepdim=True)
+
+    # Normalize input_data
+    normalized_data = (input_data - mean) / torch.sqrt(var + epsilon)
+
+    # Scale and shift
+    output_data = gamma * normalized_data + beta
+
+    return output_data
+example_forward_input_2 = torch.randn(1, 1, 224, 224)
+x = convolution_torch(example_forward_input_2, conv_weights, conv_biases)
+#x = convolution_torch(ones_pytorch, conv_weights, conv_biases)
 #x,_,_ = batch_norm(x, bn_weights, bn_biases, bn_running_mean, bn_running_var, eps=1e-5, momentum=0.1)
 #print(x)
-m = nn.BatchNorm2d(1)
-x = m(x)
+#m = nn.BatchNorm2d(1)
+#x = m(x)
+x = batch_norm2d(x, bn_weights, bn_biases)
 x = rectified(x)
-savm = module.save("test25.pth")
-loadm = torch.jit.load("test25.pth")
+savm = module.save("test26.pth")
+loadm = torch.jit.load("test26.pth")
 
 with torch.no_grad():
-    torch_output = loadm(ones_pytorch)
+    torch_output = loadm(example_forward_input_2)
 
 
 print(f'torch output: {torch_output} \n\n myoutput: {x}')
