@@ -53,3 +53,33 @@ tensor([[[[ 0.0225,  0.2030,  0.1440],
 tensor([0.2936])
 >>>
 """
+
+def get_node_inputs(module):
+    graph = module.graph.copy()
+    nodes = get_nodes(graph)
+    inputs = []
+    for node in nodes:
+        input_nodes = list(node.inputs())
+        inputs.append(input_nodes)
+
+    input_types = []
+    for node in inputs:
+        for inp in node:
+            input_types.append(inp.type().str())
+
+    return input_types
+
+def get_nodes(graph):
+    return [node for node in graph.nodes()]
+
+def get_operations(module):
+    graph = module.graph.copy()
+    nodes = get_nodes(graph)
+    
+    operations = []
+    for node in nodes:
+        operation_type = node.kind()
+        operations.append(operation_type)
+
+    return operations
+
