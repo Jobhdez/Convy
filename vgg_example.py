@@ -1,17 +1,16 @@
 import torch
 import torch.nn as nn
 from compiler import  get_node_inputs
-
-import torch
-import torch.nn as nn
+from conv2d import convolution
 from torch.nn import functional as F
 from torch.jit.annotations import Optional
+import numpy as np
 
 class VGG16Block(nn.Module):
     def __init__(self):
         super(VGG16Block, self).__init__()
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1)
-        self.bn1 = nn.BatchNorm2d(64)
+        self.conv1 = nn.Conv2d(1,1,3)
+        self.bn1 = nn.BatchNorm2d(1)
         self.relu1 = nn.ReLU()
 
     def forward(self, x):
@@ -21,15 +20,9 @@ class VGG16Block(nn.Module):
         return x
 net = VGG16Block()
 
-# Creating an example input tensor
-batch_size = 1
-channels = 3  # RGB channels
-height = 224
-width = 224
 
-inp2  = torch.tensor([[0.0,3.0,2.0], [3.0, 4.5, 5.6], [5.6, 6.0,5.0]])
-example_input = inp2.view(1, 1, inp2.size(0), inp2.size(1))
-module = torch.jit.trace(net, example_input)
+example_forward_input = torch.randn(1, 1, 224, 224) 
+module = torch.jit.trace(net, example_forward_input)
 
 # Rest of your code...
 
@@ -94,12 +87,31 @@ def conv2d(input_tensor, weight, bias):
     corr = corr2d(input_tensor, weight)
     return corr + bias
 
+import torch
+
+def convolution_torch(input_data, weight, bias):
+    # Assuming 'input_data' is a 4D tensor (batch_size, channels, height, width)
+    _, _, input_height, input_width = input_data.size()
+    _, _, filter_height, filter_width = weight.size()
+
+    output_height = input_height - filter_height + 1
+    output_width = input_width - filter_width + 1
+
+    output = torch.zeros(1, 1, output_height, output_width)
+
+    for h in range(output_height):
+        for w in range(output_width):
+            receptive_field = input_data[:, :, h:h+filter_height, w:w+filter_width]
+            output[:, :, h, w] = torch.sum(receptive_field * weight) + bias
+
+    return output
+
 
 # relu
 def rectified(x):
     return torch.max(torch.tensor(0.0), x)
 
-
+"""
 batch_size = 1
 channels = 3  # RGB channels
 height = 224
@@ -109,13 +121,25 @@ input_tensor_2d = input_tensor.view(batch_size, channels, -1)
 in_channels = channels
 out_channels = 64
 kernel_size = (3, 3)
+"""
+new_input_data = np.ones((1, 1, 224, 224), dtype=np.float32)
+ones_pytorch = torch.tensor(new_input_data, dtype=torch.float32)
+conv_name = 'conv1'
+bn_name = 'bn1'
 
-# Initialize weight tensor
-weight = nn.Parameter(torch.rand(kernel_size))
-bias = nn.Parameter(torch.zeros(1))
-inp = torch.tensor([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0], [6.0, 7.0, 8.0]])
+# Extract convolutional layer weights and biases
+conv_weights = state_dict[conv_name + '.weight']
+conv_biases = state_dict[conv_name + '.bias']
 
+# Extract batch normalization layer weights, biases, running mean, and running variance
+bn_weights = state_dict[bn_name + '.weight']
+bn_biases = state_dict[bn_name + '.bias']
+bn_running_mean = state_dict[bn_name + '.running_mean']
+bn_running_var = state_dict[bn_name + '.running_var']
+
+""""
 x = conv2d(inp, weight, bias)
+#x = convolution(input_tensor
 print(x)
 
 shape = (1, 64, 1, 1)
@@ -129,13 +153,21 @@ x, _, _ = batch_norm(x, gamma, beta,
                              moving_mean, moving_var,
                             eps=1e-5, momentum=0.1)
 x = rectified(x)
-print(x)
+"""
+x = convolution_torch(ones_pytorch, conv_weights, conv_biases)
+#x,_,_ = batch_norm(x, bn_weights, bn_biases, bn_running_mean, bn_running_var, eps=1e-5, momentum=0.1)
+#print(x)
+m = nn.BatchNorm2d(1)
+x = m(x)
+x = rectified(x)
 savm = module.save("test25.pth")
 loadm = torch.jit.load("test25.pth")
 
 with torch.no_grad():
-    inp = inp.view(1, 1, inp.size(0), inp.size(1))
-    torch_output = loadm(inp)
+    torch_output = loadm(ones_pytorch)
 
 
 print(f'torch output: {torch_output} \n\n myoutput: {x}')
+
+
+                
