@@ -10,7 +10,7 @@ from torch.jit.annotations import Optional
 class VGG16Block(nn.Module):
     def __init__(self):
         super(VGG16Block, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu1 = nn.ReLU()
 
@@ -27,8 +27,8 @@ channels = 3  # RGB channels
 height = 224
 width = 224
 
-example_input = torch.randn(batch_size, channels, height, width)
-
+inp2  = torch.tensor([[0.0,3.0,2.0], [3.0, 4.5, 5.6], [5.6, 6.0,5.0]])
+example_input = inp2.view(1, 1, inp2.size(0), inp2.size(1))
 module = torch.jit.trace(net, example_input)
 
 # Rest of your code...
@@ -134,7 +134,8 @@ savm = module.save("test25.pth")
 loadm = torch.jit.load("test25.pth")
 
 with torch.no_grad():
-    inp = inp.view(1,3,3,1)
+    inp = inp.view(1, 1, inp.size(0), inp.size(1))
     torch_output = loadm(inp)
+
 
 print(f'torch output: {torch_output} \n\n myoutput: {x}')
