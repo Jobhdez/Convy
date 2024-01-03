@@ -13,20 +13,26 @@ def compile(module):
 
     for node in inputs:
         for inp in node:
-            match inp.type().str():
-                case '__torch__.conv2d.Net':
-                    state_dict = module.state_dict()
-                    weight = state_dict['conv.weight']
-                    bias = state_dict['conv.bias']
-                    device = re.findall('device=(cpu|gpu)', inp.__repr__())
-                    device = device[0]
-                    conv2d = Conv2d(weight, bias, device)
+            if 'conv2' or 'Conv2d'  in inp.type().str():
 
-                    return conv2d
+                state_dict = module.state_dict()
+                weight = state_dict['conv.weight']
+                bias = state_dict['conv.bias']
+                device = re.findall('device=(cpu|gpu)', inp.__repr__())
+                device = device[0]
+                conv2d = Conv2d(weight, bias, device)
 
-                case _:
-                    break
+                return conv2d
+            elif 'BatchNorm2d' in inp.type().str():
+                return BatchNorm2d()
+            elif 'reLU' in inp.type().str():
+                return Relu()
 
+class Relu:
+    pass
+
+class BatchNorm2d:
+    pass 
     
 class Conv2d:
     def __init__(self, weight, bias, device):
