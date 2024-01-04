@@ -21,10 +21,12 @@ class TensorMetadata(NamedTuple):
     requires_grad : bool
     stride : Tuple[int, ...]
     memory_format : Optional[torch.memory_format]
+    data: torch.Tensor
 
     # Quantization metadata
     is_quantized : bool
     qparams: Dict[str, Any]
+    
 
 def _extract_tensor_metadata(result : torch.Tensor, include_contiguity=True) -> TensorMetadata:
     """
@@ -63,9 +65,10 @@ def _extract_tensor_metadata(result : torch.Tensor, include_contiguity=True) -> 
             qparams["scale"] = result.q_per_channel_scales().tolist()  # type: ignore[assignment]
             qparams["zero_point"] = result.q_per_channel_zero_points().tolist()  # type: ignore[assignment]
             qparams["axis"] = result.q_per_channel_axis()  # type: ignore[assignment]
+    result_data = result.detach()
 
     return TensorMetadata(
-        shape, dtype, requires_grad, stride, memory_format, is_quantized, qparams)
+        shape, dtype, requires_grad, stride, memory_format, result_data, is_quantized, qparams)
 
 @compatibility(is_backward_compatible=True)
 class ShapeProp(torch.fx.Interpreter):
@@ -213,6 +216,13 @@ sample_input = torch.randn(50, D_in)
 ShapeProp(gm).propagate(sample_input)
 for node in gm.graph.nodes:
     print(node.name, node.meta['tensor_meta'].dtype,
-    node.meta['tensor_meta'].shape)
+          node.meta['tensor_meta'].shape, node.meta['tensor_meta'].data)
+
+for node in gm.graph.nodes:
+    type(node)
 
 gm.graph.print_tabular()
+
+def get_layers(graph):
+    
+    return list(graph.named.modules())
