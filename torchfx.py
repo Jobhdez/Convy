@@ -7,7 +7,7 @@ from torch.fx.node import Node, map_aggregate
 from typing import Any, Tuple, NamedTuple, Optional, Dict
 from torch.fx._compatibility import compatibility
 from torch._guards import detect_fake_mode
-
+### this is taken from the pytorch docs
 __all__ = ['TensorMetadata', 'ShapeProp']
 
 @compatibility(is_backward_compatible=True)
