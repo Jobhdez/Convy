@@ -5,7 +5,7 @@ from conv2d import convolution
 from torch.nn import functional as F
 from torch.jit.annotations import Optional
 import numpy as np
-from torchfx import ShapeProp, get_layers
+from ..torchfx import ShapeProp, get_layers
 
 class VGG16Block(nn.Module):
     def __init__(self):
