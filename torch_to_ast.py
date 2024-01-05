@@ -3,10 +3,12 @@ import torch.nn as nn
 from conv2d import get_nodes, get_inputs
 from torchfx import ShapeProp, get_layers
 
-def torch_to_ast(gm, module, input_tensor):
+def torch_to_ast(net, input_tensor):
     """
-    constructs an AST from a torch.fx Graph and torch.jit.trace module.
+    constructs an AST from a neural net and input tensor.
     """
+    module = torch.jit.trace(net, input_tensor)
+    gm = torch.fx.symbolic_trace(net)
     layers = get_layers(gm)
     nodes = ShapeProp(gm)
     nodes.propagate(input_tensor)
