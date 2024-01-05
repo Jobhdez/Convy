@@ -299,6 +299,18 @@ print(result)
 
 layers = get_layers(gm2)
 """
+class Conv2dNode:
+    def __init__(self, input_tensor, weight, bias, input_height, input_width, filter_height, filter_width, batch_size, channels):
+        self.input_tensor = input_tensor
+        self.weight = weight
+        self.bias = bias
+        self.input_height = input_height
+        self.input_width = input_width
+        self.filter_height = filter_height
+        self.filter_width = filter_width
+        self.batch_size = batch_size
+        self.channels = channels
+
 net = Net()
 ones = np.ones((1,1,3,3), dtype=np.float32)
 input_tensor = torch.tensor(ones, dtype=torch.float32)
@@ -345,21 +357,10 @@ def torch_to_ast(net, input_tensor):
                 bias = float(bias_tensor[0])
             else:
                 bias = bias_tensor
-            ast_nodes.append(Conv2d(input_tensor, weight, bias, input_height, input_width, filter_height, filter_width, batch_size, channels))
-          
-    return ast_nodes        
+            ast_nodes.append(Conv2dNode(input_tensor, weight, bias, input_height, input_width, filter_height, filter_width, batch_size, channels))
+    return ast_nodes
         
-class Conv2d:
-    def __init__(self, input_tensor, weight, bias, input_height, input_width, filter_height, filter_width, batch_size, channels):
-        self.input_tensor = input_tensor
-        self.weight = weight
-        self.bias = bias
-        self.input_height = input_height
-        self.input_width = input_width
-        self.filter_height = filter_height
-        self.filter_width = filter_width
-        self.batch_size = batch_size
-        self.channels = channels
+
 
 conv2d = torch_to_ast(net, input_tensor)
 
@@ -383,3 +384,69 @@ with torch.no_grad():
 np_output = convolution_torch(ones_pytorch, weight, bias)
 
 print(f'torch output: {torch_output} \n\n numpy_output: {np_output}')
+
+def to_c(node):
+    print(type(node))
+    if isinstance(node, Conv2dNode):
+            
+        c_str = ""
+        c_str = c_str = '#include "runtime.c"\n'
+        c_str = c_str + "#include <stdio.h>\n\n"
+
+        bias = str(node.bias)
+        input_h = str(node.input_height)
+        input_w = str(node.input_width)
+        filter_h = str(node.filter_height)
+        filter_w = str(node.filter_width)
+        batch_s = str(node.batch_size)
+        channels = str(node.channels)
+
+        tensor = torch_tensor_to_c(node.input_tensor)
+        weight = torch_tensor_to_c(node.weight)
+        
+        c_str = c_str + "\nint main() {\n\n"
+        c_str = c_str + f'int batch_size = {str(int(batch_s))};\n\n'
+        c_str = c_str + f'int channels = {str(int(channels))};\n\n'
+        c_str = c_str + f'int input_height = {str(int(input_h))};\n\n'
+        c_str = c_str + f'int input_width = {str(int(input_w))};\n\n'
+        c_str = c_str + f'int filter_height = {str(int(filter_h))};\n\n'
+        c_str = c_str + f'int filter_width = {str(int(filter_w))};\n\n'
+
+        c_str = c_str + f'float input_data[{batch_s}][{channels}][{input_h}][{input_w}] = {tensor};\n\n'
+        c_str = c_str + f'float weight[{batch_s}][{channels}][{filter_h}][{filter_w}] = {weight};\n\n'
+        c_str = c_str + f'float bias = {bias};\n'
+        c_str = c_str + f'float output[{batch_s}][{channels}][{filter_h}][{filter_h}];\n\n'
+        c_print = """ convolution(input_data, weight, &bias, batch_size, channels, input_height, input_width, filter_height, filter_width, output);\n\n
+
+    // Print the result
+    for (int i = 0; i < batch_size; ++i) {
+        for (int j = 0; j < 1; ++j) {  // Assuming output has only one channel
+            for (int k = 0; k < 3; ++k) {
+                for (int l = 0; l < 3; ++l) {
+                    printf("%f ", output[i][j][k][l]);
+                }
+                
+            }
+        }
+    }"""
+    c_str = c_str + c_print + 'return 0;\n}'
+    return c_str
+
+
+                
+def torch_tensor_to_c(tensor):
+    
+    c_array = tensor.numpy()
+    c_array = c_array.tolist()
+    c_array = str(c_array)
+    print(c_array)
+    c_array = c_array.replace('[', '{').replace(']', '}')
+    return c_array
+
+
+c_str = to_c(conv2d[0])
+
+with open("conv.c", "w") as f:
+    f.write(c_str)
+    
+
