@@ -22,6 +22,8 @@ class TensorMetadata(NamedTuple):
     stride : Tuple[int, ...]
     memory_format : Optional[torch.memory_format]
     data: torch.Tensor
+    weight: torch.Tensor
+    bias: torch.Tensor 
 
     # Quantization metadata
     is_quantized : bool
@@ -67,8 +69,17 @@ def _extract_tensor_metadata(result : torch.Tensor, include_contiguity=True) -> 
             qparams["axis"] = result.q_per_channel_axis()  # type: ignore[assignment]
     result_data = result.detach()
 
+    weight = None
+    bias = None
+
+    if result.requires_grad and len(result.shape) == 4:  # Assuming ConvNet weights are 4-dimensional
+        if result.grad_fn is not None and "Conv" in str(result.grad_fn):
+            weight = result.clone().detach().requires_grad_(False)
+            bias = result.grad_fn.next_functions[1][0].variable.clone().detach().requires_grad_(False)
+
+
     return TensorMetadata(
-        shape, dtype, requires_grad, stride, memory_format, result_data, is_quantized, qparams)
+        shape, dtype, requires_grad, stride, memory_format, result_data,weight, bias, is_quantized, qparams)
 
 @compatibility(is_backward_compatible=True)
 class ShapeProp(torch.fx.Interpreter):
@@ -174,6 +185,7 @@ class ShapeProp(torch.fx.Interpreter):
         meta = map_aggregate(result, extract_tensor_meta)
         if found_tensor:
             n.meta['tensor_meta'] = meta
+            
 
         n.meta['type'] = type(result)
         return result
@@ -190,7 +202,7 @@ class ShapeProp(torch.fx.Interpreter):
             Any: The value returned from executing the Module
         """
         if self.fake_mode is not None:
-            fake_args = [self.fake_mode.from_tensor(t) if isinstance(t, torch.Tensor) else t for t in args]
+             fake_args = [self.fake_mode.from_tensor(t) if isinstance(t, torch.Tensor) else t for t in args]
             #fake_args = [t.detach() if isinstance(t, torch.Tensor) else t for t in args]
         else:
             fake_args = args
@@ -206,6 +218,15 @@ class TwoLayerNet(torch.nn.Module):
         h_relu = self.linear1(x).clamp(min=0)
         y_pred = self.linear2(h_relu)
         return y_pred
+
+class Net(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv = torch.nn.Conv2d(1, 1, 3)
+
+    def forward(self, x):
+        return self.conv(x)
+
     
 N, D_in, H, D_out = 64, 1000, 100, 10
 x = torch.randn(N, D_in)
@@ -225,4 +246,104 @@ gm.graph.print_tabular()
 
 def get_layers(graph):
     
-    return list(graph.named.modules())
+    return list(graph.named_modules())
+
+net = Net()
+gm2 = torch.fx.symbolic_trace(net)
+sample = torch.rand(1, 1, 3, 3)
+module = torch.jit.trace(net, sample)
+state_dict = module.state_dict()
+
+print("-----print sample----")
+print(sample)
+shape_prop = ShapeProp(gm2)
+shape_prop.propagate(sample)
+print("\n")
+print("---meta-data")
+for node in gm2.graph.nodes:
+    print(node.name, node.meta['tensor_meta'].dtype,
+          node.meta['tensor_meta'].shape, node.meta['tensor_meta'].data,
+          node.meta['tensor_meta'].weight, node.meta['tensor_meta'].bias)
+
+print(get_layers(gm2))
+
+print("\nstate_dict")
+weight = state_dict['conv.weight']
+bias = state_dict['conv.bias']
+
+print(state_dict)
+
+def convolution_torch(input_data, weight, bias):
+    # Assuming 'input_data' is a 4D tensor (batch_size, channels, height, width)
+    _, _, input_height, input_width = input_data.size()
+    _, _, filter_height, filter_width = weight.size()
+
+    output_height = input_height - filter_height + 1
+    output_width = input_width - filter_width + 1
+
+    output = torch.zeros(1, 1, output_height, output_width)
+
+    for h in range(output_height):
+        for w in range(output_width):
+            receptive_field = input_data[:, :, h:h+filter_height, w:w+filter_width]
+            output[:, :, h, w] = torch.sum(receptive_field * weight) + bias
+
+    return output
+
+print("\n convolution result")
+result = convolution_torch(sample, weight, bias)
+print(result)
+
+layers = get_layers(gm2)
+
+def torch_to_ast(gm, module, input_tensor):
+    layers = get_layers(gm)
+    nodes = ShapeProp(gm)
+    nodes.propagate(input_tensor)
+
+    tensor_data = []
+    for node in gm.graph.nodes:
+        tensor_data.append({'name': node.name, 'dtype': node.meta['tensor_meta'].dtype, 'shape': node.meta['tensor_meta'].shape, 'tensor': node.meta['tensor_meta'].data})
+
+    layers_lst = [list(layer) for layer in layers]
+    print(layers_lst)
+    layers = layers_lst[1:]
+    print(layers)
+    layers = [{'name': layer[0], 'nn_obj': layer[1]} for layer in layers]
+    print(layers)
+    print(type(layers[0]['nn_obj']))
+
+    for layer in range(len(layers)):
+        nn_obj = layers[layer]['nn_obj']
+        print(nn_obj)
+        print(type(nn_obj))
+        if isinstance(nn_obj, torch.nn.modules.conv.Conv2d):
+            input_tensor = None
+            weight_tensor = None
+            for tensor in tensor_data:
+                if tensor['name'] == 'x':
+                    input_tensor = tensor['tensor']
+                elif tensor['name'] == layers[layer]['name']:
+                    input_name = tensor['name']
+                    weight_tensor = tensor['tensor']
+
+            state_dict = module.state_dict()
+            bias_name = input_name + ".bias"
+            bias_tensor = state_dict[bias_name]
+
+            return Conv2d(input_tensor, weight, bias)
+        else:
+            break 
+class Conv2d:
+    def __init__(self, input_tensor, weight, bias):
+        self.input_tensor = input_tensor
+        self.weight = weight
+        self.bias = bias
+
+class NotYetImplemented:
+    def __repr__():
+        return f'Neural Network not yet implemented'
+
+        
+conv2d = torch_to_ast(gm2, module, sample)
+
