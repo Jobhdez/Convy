@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from conv2d import get_nodes, get_inputs
+#from conv2d import get_nodes, get_inputs
 from torchfx import ShapeProp, get_layers
 
 
