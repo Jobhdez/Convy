@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
-from compiler import  get_node_inputs
+#from compiler import  get_node_inputs
 from conv2d import convolution
 from torch.nn import functional as F
 from torch.jit.annotations import Optional
 import numpy as np
+from torchfx import ShapeProp, get_layers
 
 class VGG16Block(nn.Module):
     def __init__(self):
@@ -70,10 +71,10 @@ make scriptmodule, i.e. torch.jit.trace(..)
 net = VGG16Block()
 
 
-example_forward_input = torch.randn(1, 1, 224, 224) 
-module = torch.jit.trace(net, example_forward_input)
+#example_forward_input = torch.randn(1, 1, 224, 224) 
+#module = torch.jit.trace(net, example_forward_input)
 
-state_dict = module.state_dict()
+#state_dict = module.state_dict()
 
 
 """
@@ -87,118 +88,60 @@ def run_vgg_example(input_tensor,
                     conv_weight,
                     conv_bias,
                     bn_weights,
-                    bn_biases):
+                    bn_biases,
+                    module):
     print("running example ...")
 
-    x = convolution_torch(example_forward_input_2, conv_weights, conv_biases)
+    x = convolution_torch(input_tensor, conv_weight, conv_bias)
     x = batch_norm2d(x, bn_weights, bn_biases)
     x = rectified(x)
-    savm = module.save("test26.pth")
-    loadm = torch.jit.load("test26.pth")
+    savm = module.save("test31.pth")
+    loadm = torch.jit.load("test31.pth")
 
     with torch.no_grad():
-        torch_output = loadm(example_forward_input_2)
+        torch_output = loadm(input_tensor)
 
     return f'torch output: {torch_output} \n\n myoutput: {x}'
 
 
 
-conv_name = 'conv1'
-bn_name = 'bn1'
+#conv_name = 'conv1'
+#bn_name = 'bn1'
 
-conv_weights = state_dict[conv_name + '.weight']
-conv_biases = state_dict[conv_name + '.bias']
+#conv_weights = state_dict[conv_name + '.weight']
+#conv_biases = state_dict[conv_name + '.bias']
 
 
-bn_weights = state_dict[bn_name + '.weight']
-bn_biases = state_dict[bn_name + '.bias']
+#bn_weights = state_dict[bn_name + '.weight']
+#bn_biases = state_dict[bn_name + '.bias']
 
-bn_running_mean = state_dict[bn_name + '.running_mean']
-bn_running_var = state_dict[bn_name + '.running_var']
+#bn_running_mean = state_dict[bn_name + '.running_mean']
+#bn_running_var = state_dict[bn_name + '.running_var']
 
 example_forward_input_2 = torch.randn(1, 1, 224, 224)
 
-run_vgg_example(example_forward_input_2, conv_weights, conv_biases, bn_weights, bn_biases)
+#run_vgg_example(example_forward_input_2, conv_weights, conv_biases, bn_weights, bn_biases)
 
 
 ##---------------------------------------
 ##--------------torch.fx-----------------
 
-from torch.fx.node import Node
-from typing import Dict
-import torch
+gm = torch.fx.symbolic_trace(net)
+ShapeProp(gm).propagate(example_forward_input_2)
+print("\n\n gm nodes\n\n")
+for node in gm.graph.nodes:
+    print(node.name, node.meta['tensor_meta'].dtype,
+          node.meta['tensor_meta'].shape, node.meta['tensor_meta'].data)
 
-class ShapeProp:
-    """
-    Shape propagation. This class takes a `GraphModule`.
-    Then, its `propagate` method executes the `GraphModule`
-    node-by-node with the given arguments. As each operation
-    executes, the ShapeProp class stores away the shape, element type,
-    and tensor data for the output values of each operation on
-    the `shape`, `dtype`, and `data` attributes of the operation's
-    `Node`.
-    """
-    def __init__(self, mod):
-        self.mod = mod
-        self.graph = mod.graph
-        self.modules = dict(self.mod.named_modules())
+print("\n\nstate dict\n\n")
+module = torch.jit.trace(net, example_forward_input_2)
 
-    def propagate(self, *args):
-        args_iter = iter(args)
-        env: Dict[str, Node] = {}
+state_dict = module.state_dict()
+print(state_dict)
+weight = state_dict['conv1.weight']
+bias = state_dict['conv1.bias']
+bn_mean = state_dict['bn1.running_mean']
+bn_var = state_dict['bn1.running_var']
+print(get_layers(gm))
 
-        def load_arg(a):
-            return torch.fx.graph.map_arg(a, lambda n: env[n.name])
-
-        def fetch_attr(target: str):
-            target_atoms = target.split('.')
-            attr_itr = self.mod
-            for i, atom in enumerate(target_atoms):
-                if not hasattr(attr_itr, atom):
-                    raise RuntimeError(f"Node referenced nonexistent target {'.'.join(target_atoms[:i])}")
-                attr_itr = getattr(attr_itr, atom)
-            return attr_itr
-
-        for node in self.graph.nodes:
-            if node.op == 'placeholder':
-                result = next(args_iter)
-            elif node.op == 'get_attr':
-                result = fetch_attr(node.target)
-            elif node.op == 'call_function':
-                result = node.target(*load_arg(node.args), **load_arg(node.kwargs))
-            elif node.op == 'call_method':
-                self_obj, *args = load_arg(node.args)
-                kwargs = load_arg(node.kwargs)
-                result = getattr(self_obj, node.target)(*args, **kwargs)
-            elif node.op == 'call_module':
-                result = self.modules[node.target](*load_arg(node.args), **load_arg(node.kwargs))
-
-            # This is the only code specific to shape propagation.
-            # you can delete this `if` branch and this becomes
-            # a generic GraphModule interpreter.
-            if isinstance(result, torch.Tensor):
-                node.shape = result.shape
-                node.dtype = result.dtype
-                node.data = result
-                
-
-            env[node.name] = result
-
-        return load_arg(self.graph.result)
-
-from torch.fx import symbolic_trace
-gm = symbolic_trace(net)
-
-#input_tensor = torch.randn(1,1,32,32)
-#result = sp.propagate(input_tensor)
-
-gmodule = torch.fx.GraphModule(net, gm.graph)
-
-# Create an instance of ShapeProp using the GraphModule
-shape_prop = ShapeProp(gmodule)
-
-# Example input tensor
-input_tensor = torch.randn(1, 1, 32, 32)
-
-# Propagate shapes through the GraphModule
-result = shape_prop.propagate(input_tensor)
+print(run_vgg_example(example_forward_input_2, weight, bias, bn_mean, bn_var, module))
