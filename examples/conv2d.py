@@ -58,7 +58,7 @@ state_dict = module.state_dict()
 # Manually set the weights and biases
 weight = state_dict['conv.weight'].numpy()
 bias = state_dict['conv.bias'].numpy()
-
+print(f'bias {bias}')
 # Manually perform the convolution operation
 def convolution(input_data, weight, bias):
     # Assuming 'input_data' is a 4D tensor (batch_size, channels, height, width)
