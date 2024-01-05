@@ -1,7 +1,7 @@
 import torch
 import torch.fx
 import traceback
-
+import numpy as np
 from torch._dispatch.python import enable_python_dispatcher
 from torch.fx.node import Node, map_aggregate
 from typing import Any, Tuple, NamedTuple, Optional, Dict
@@ -222,12 +222,12 @@ class TwoLayerNet(torch.nn.Module):
 class Net(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv = torch.nn.Conv2d(1, 1, 3)
+        self.conv = torch.nn.Conv2d(1, 1, 3).float()
 
     def forward(self, x):
         return self.conv(x)
 
-    
+""" 
 N, D_in, H, D_out = 64, 1000, 100, 10
 x = torch.randn(N, D_in)
 y = torch.randn(N, D_out)
@@ -243,17 +243,20 @@ for node in gm.graph.nodes:
     type(node)
 
 gm.graph.print_tabular()
-
+"""
 def get_layers(graph):
     
     return list(graph.named_modules())
 
+"""
 net = Net()
 gm2 = torch.fx.symbolic_trace(net)
 sample = torch.rand(1, 1, 3, 3)
 module = torch.jit.trace(net, sample)
 state_dict = module.state_dict()
+"""
 
+"""
 print("-----print sample----")
 print(sample)
 shape_prop = ShapeProp(gm2)
@@ -272,11 +275,11 @@ weight = state_dict['conv.weight']
 bias = state_dict['conv.bias']
 
 print(state_dict)
-
+"""
 def convolution_torch(input_data, weight, bias):
     # Assuming 'input_data' is a 4D tensor (batch_size, channels, height, width)
-    _, _, input_height, input_width = input_data.size()
-    _, _, filter_height, filter_width = weight.size()
+    _, _, input_height, input_width = input_data.shape
+    _, _, filter_height, filter_width = weight.shape 
 
     output_height = input_height - filter_height + 1
     output_width = input_width - filter_width + 1
@@ -289,18 +292,23 @@ def convolution_torch(input_data, weight, bias):
             output[:, :, h, w] = torch.sum(receptive_field * weight) + bias
 
     return output
-
+"""
 print("\n convolution result")
 result = convolution_torch(sample, weight, bias)
 print(result)
 
 layers = get_layers(gm2)
-
-def torch_to_ast(gm, module, input_tensor):
+"""
+net = Net()
+ones = np.ones((1,1,3,3), dtype=np.float32)
+input_tensor = torch.tensor(ones, dtype=torch.float32)
+def torch_to_ast(net, input_tensor):
+    module = torch.jit.trace(net, input_tensor)
+    gm = torch.fx.symbolic_trace(net)
     layers = get_layers(gm)
     nodes = ShapeProp(gm)
     nodes.propagate(input_tensor)
-
+    
     tensor_data = []
     for node in gm.graph.nodes:
         tensor_data.append({'name': node.name, 'dtype': node.meta['tensor_meta'].dtype, 'shape': node.meta['tensor_meta'].shape, 'tensor': node.meta['tensor_meta'].data})
@@ -312,7 +320,7 @@ def torch_to_ast(gm, module, input_tensor):
     layers = [{'name': layer[0], 'nn_obj': layer[1]} for layer in layers]
     print(layers)
     print(type(layers[0]['nn_obj']))
-
+    ast_nodes = []
     for layer in range(len(layers)):
         nn_obj = layers[layer]['nn_obj']
         print(nn_obj)
@@ -326,24 +334,52 @@ def torch_to_ast(gm, module, input_tensor):
                 elif tensor['name'] == layers[layer]['name']:
                     input_name = tensor['name']
                     weight_tensor = tensor['tensor']
-
             state_dict = module.state_dict()
             bias_name = input_name + ".bias"
+            weight = state_dict[input_name + ".weight"]
             bias_tensor = state_dict[bias_name]
-
-            return Conv2d(input_tensor, weight, bias)
-        else:
-            break 
+            batch_size, channels, input_height, input_width = input_tensor.shape
+            _,_, filter_height, filter_width = weight.shape
+            bias = None
+            if len(bias_tensor) == 1 and isinstance(float(bias_tensor[0]), float):
+                bias = float(bias_tensor[0])
+            else:
+                bias = bias_tensor
+            ast_nodes.append(Conv2d(input_tensor, weight, bias, input_height, input_width, filter_height, filter_width, batch_size, channels))
+          
+    return ast_nodes        
+        
 class Conv2d:
-    def __init__(self, input_tensor, weight, bias):
+    def __init__(self, input_tensor, weight, bias, input_height, input_width, filter_height, filter_width, batch_size, channels):
         self.input_tensor = input_tensor
         self.weight = weight
         self.bias = bias
+        self.input_height = input_height
+        self.input_width = input_width
+        self.filter_height = filter_height
+        self.filter_width = filter_width
+        self.batch_size = batch_size
+        self.channels = channels
 
-class NotYetImplemented:
-    def __repr__():
-        return f'Neural Network not yet implemented'
+conv2d = torch_to_ast(net, input_tensor)
 
-        
-conv2d = torch_to_ast(gm2, module, sample)
+### test
 
+
+ones = np.ones((1, 1, 3, 3), dtype=np.float32)
+
+ones_pytorch = torch.tensor(ones, dtype=torch.float32)
+module = torch.jit.trace(net, ones_pytorch)
+state_dict = module.state_dict()
+weight = state_dict['conv.weight']
+bias = state_dict['conv.bias']
+
+savm = module.save('test1.pth')
+loadm = torch.jit.load('test1.pth')
+
+with torch.no_grad():
+    torch_output = loadm(ones_pytorch)
+
+np_output = convolution_torch(ones_pytorch, weight, bias)
+
+print(f'torch output: {torch_output} \n\n numpy_output: {np_output}')
