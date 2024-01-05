@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-void convolution(float input_data[][1][5][5], float weight[][1][3][3], float* bias, int batch_size, int channels,   int input_height, int input_width, int filter_height, int filter_width, float output[][1][3][3]) {
+void convolution(float input_data[][1][3][3], float weight[][1][3][3], float* bias, int batch_size, int channels, int input_height, int input_width, int filter_height, int filter_width, float output[][1][3][3]) {
     int output_height = input_height - filter_height + 1;
     int output_width = input_width - filter_width + 1;
 
@@ -23,6 +23,7 @@ void convolution(float input_data[][1][5][5], float weight[][1][3][3], float* bi
     }
 }
 
+/*
 int main() {
     // Example usage
     int batch_size = 1;
@@ -53,3 +54,4 @@ int main() {
 
     return 0;
 }
+*/
