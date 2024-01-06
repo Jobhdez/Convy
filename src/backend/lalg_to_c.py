@@ -34,19 +34,17 @@ def to_c(node):
         c_str = c_str + f'float weight[{batch_s}][{channels}][{filter_h}][{filter_w}] = {weight};\n\n'
         c_str = c_str + f'float bias = {bias};\n'
         c_str = c_str + f'float output[{batch_s}][{channels}][{filter_h}][{filter_h}];\n\n'
-        c_print = """ convolution(input_data, weight, &bias, batch_size, channels, input_height, input_width, filter_height, filter_width, output);\n\n
-
-    // Print the result
-    for (int i = 0; i < batch_size; ++i) {
-        for (int j = 0; j < 1; ++j) {  // Assuming output has only one channel
-            for (int k = 0; k < 3; ++k) {
-                for (int l = 0; l < 3; ++l) {
-                    printf("%f ", output[i][j][k][l]);
-                }
-                
-            }
-        }
-    }"""
+        c_print = "convolution(input_data, weight, &bias, batch_size, channels, input_height, input_width, filter_height, filter_width, output);\n\n"
+        c_print = c_print + "for (int i = 0; i < batch_size; ++i) {\n"
+        c_print = c_print + "  for (int j = 0; j < 1; ++j) {\n"
+        c_print = c_print + "     for (int k = 0; k < 3; ++k) {\n"
+        c_print = c_print + "       for (int l = 0; l < 3; ++l) {\n"
+        c_print = c_print + '         printf("%f ", output[i][j][k][l]);\n'
+        c_print = c_print + "       }\n"
+        c_print = c_print + "     }\n"
+        c_print = c_print + "  }\n"
+        c_print = c_print + "}\n"
+   
         c_str = c_str + c_print + 'return 0;\n}'
         return c_str
 
