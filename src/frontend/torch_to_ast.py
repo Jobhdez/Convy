@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-#from conv2d import get_nodes, get_inputs
-from torchfx import ShapeProp, get_layers
+from src.frontend.nodes import Conv2dNode
+from src.frontend.extract_tensor_data import ShapeProp
 
 def torch_to_ast(net, input_tensor):
     module = torch.jit.trace(net, input_tensor)
@@ -46,20 +46,10 @@ def torch_to_ast(net, input_tensor):
                 bias = float(bias_tensor[0])
             else:
                 bias = bias_tensor
-            ast_nodes.append(Conv2d(input_tensor, weight, bias, input_height, input_width, filter_height, filter_width, batch_size, channels))
-          
-    return ast_nodes        
-            
-        
-class Conv2d:
-    __match_args__ = ('input_tensor', 'weight', 'bias', 'input_height', 'input_width', 'filter_height', 'filter_width', 'batch_size', 'channels')
-    def __init__(self, input_tensor, weight, bias, input_height, input_width, filter_height, filter_width, batch_size, channels):
-        self.input_tensor = input_tensor
-        self.weight = weight
-        self.bias = bias
-        self.input_height = input_height
-        self.input_width = input_width
-        self.filter_height = filter_height
-        self.filter_width = filter_width
-        self.batch_size = batch_size
-        self.channels = channels
+            ast_nodes.append(Conv2dNode(input_tensor, weight, bias, input_height, input_width, filter_height, filter_width, batch_size, channels))
+    return ast_nodes
+
+def get_layers(graph):
+    
+    return list(graph.named_modules())
+
