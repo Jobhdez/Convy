@@ -3,6 +3,9 @@ The start of an llm compiler
 
 ## Running the examples
 So, far I have generated C code for a 2d convolutional layer.
+
+On Linux or macOS you type the following to run the example. Running the example will generste a C code file contsing the generated code for the CNN in the `conv2d.py` file in the `examples` directory.
+
 ```
 $ pip install -r requirements.txt
 $ pip install -e .
