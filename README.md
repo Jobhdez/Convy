@@ -1,9 +1,15 @@
 # llm compiler
 The start of an llm compiler
 
-## Running the code
+## Running the examples
+So, far I have generated C code for a 2d convolutional layer.
 ```
 $ pip install -r requirements.txt
+$ pip install -e .
+$ cd src/frontend
+$ python conv2d.py
+$ gcc ../backend/conv.c
+$ ./a.out
 ```
 
 ## Goals
