@@ -18,24 +18,21 @@ int filter_width = 3;
 
 float input_data[1][1][3][3] = {{{{1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}, {1.0, 1.0, 1.0}}}};
 
-float weight[1][1][3][3] = {{{{0.05152066797018051, 0.24578683078289032, 0.046719830483198166}, {-0.00031745433807373047, -0.11531953513622284, -0.12301242351531982}, {-0.14917227625846863, 0.03384590148925781, 0.12455253303050995}}}};
+float weight[1][1][3][3] = {{{{0.113400898873806, 0.28415676951408386, -0.16677796840667725}, {0.022547762840986252, 0.24742528796195984, 0.010448455810546875}, {-0.1895950734615326, -0.05162879079580307, -0.09433500468730927}}}};
 
-float bias = -0.2332494705915451;
+float bias = -0.014137348160147667;
 float output[1][1][3][3];
 
- convolution(input_data, weight, &bias, batch_size, channels, input_height, input_width, filter_height, filter_width, output);
+convolution(input_data, weight, &bias, batch_size, channels, input_height, input_width, filter_height, filter_width, output);
 
-
-
-    // Print the result
-    for (int i = 0; i < batch_size; ++i) {
-        for (int j = 0; j < 1; ++j) {  // Assuming output has only one channel
-            for (int k = 0; k < 3; ++k) {
-                for (int l = 0; l < 3; ++l) {
-                    printf("%f ", output[i][j][k][l]);
-                }
-                
-            }
-        }
-    }return 0;
+for (int i = 0; i < batch_size; ++i) {
+  for (int j = 0; j < 1; ++j) {
+     for (int k = 0; k < 3; ++k) {
+       for (int l = 0; l < 3; ++l) {
+         printf("%f ", output[i][j][k][l]);
+       }
+     }
+  }
+}
+return 0;
 }
