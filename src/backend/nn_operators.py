@@ -32,6 +32,23 @@ def batch_norm(X, gamma, beta, moving_mean, moving_var, eps, momentum):
     Y = gamma * X_hat + beta  # Scale and shift
     return Y, moving_mean.data, moving_var.data
 
+def convolution_torch(input_data, weight, bias):
+    # Assuming 'input_data' is a 4D tensor (batch_size, channels, height, width)
+    _, _, input_height, input_width = input_data.shape
+    _, _, filter_height, filter_width = weight.shape 
+
+    output_height = input_height - filter_height + 1
+    output_width = input_width - filter_width + 1
+
+    output = torch.zeros(1, 1, output_height, output_width)
+
+    for h in range(output_height):
+        for w in range(output_width):
+            receptive_field = input_data[:, :, h:h+filter_height, w:w+filter_width]
+            output[:, :, h, w] = torch.sum(receptive_field * weight) + bias
+
+    return output
+
 def corr2d(X, K):  #@save
     """Compute 2D cross-correlation."""
     h, w = K.shape
