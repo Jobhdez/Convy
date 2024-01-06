@@ -9,6 +9,7 @@ $ pip install -e .
 $ cd src/frontend
 $ python conv2d.py
 $ gcc ../backend/conv.c
+$ cd ../backend
 $ ./a.out
 ```
 
