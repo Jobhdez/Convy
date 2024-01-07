@@ -1,5 +1,5 @@
 # llm compiler
-The start of an llm compiler
+I named this repo as "llm compiler" because I was inspired by the intersection between language models and compilers. But I dont know if ill get as far as compiling a language model but so far I can compile a conv layer :-) 
 
 ## Running the examples
 So, far I have generated C code for a 2d convolutional layer.
