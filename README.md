@@ -1,10 +1,9 @@
-# llm compiler
-I named this repo as "llm compiler" because I was inspired by the intersection between language models and compilers. But I dont know if ill get as far as compiling a language model but so far I can compile a conv layer :-) 
+# convolutional layer to C code
+a little compiler that takes a neural net defined with Pytorch and lowers to C code that runs with GCC.
 
 ## Running the examples
-So, far I have generated C code for a 2d convolutional layer.
 
-On Linux or macOS you type the following to run the example. Running the example will generste a C code file contsing the generated code for the CNN in the `conv2d.py` file in the `examples` directory.
+On Linux or macOS you type the following to run the example. 
 
 ```
 $ pip install -r requirements.txt
@@ -15,9 +14,3 @@ $ gcc ../backend/conv.c
 $ cd ../backend
 $ ./a.out
 ```
-
-## Goals
-
-My main goal is not to build the next tvm. That would be silly.
-
-But I do want to make a deep learning compiler capable of compiling a VGG block to C code and Cuda call and do some optimizations. Thats what I want to build.
