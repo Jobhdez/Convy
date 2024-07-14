@@ -1,5 +1,7 @@
-# convolutional layer to C code
-a little compiler that takes a neural net defined with Pytorch and lowers to C code that runs with GCC.
+# convy
+Convy is a deep learning compiler proof of concept. So far this compiler lowers a convolution layer defined in Pytorch to C code.
+
+Hopefully, I can end up compiling a VGG convolutional neural net :-)
 
 ## Running the examples
 
