@@ -11,7 +11,6 @@ import torch
 import torch.nn as nn
 import torch.fx as fx
 
-# Define the VGG16Block class
 class VGG16Block(nn.Module):
     def __init__(self):
         super(VGG16Block, self).__init__()
@@ -25,18 +24,16 @@ class VGG16Block(nn.Module):
         x = self.relu1(x)
         return x
 
-# Create an instance of the class
+
 net = VGG16Block()
 
-# Create an input tensor
-input_tensor = torch.randn(1, 1, 5, 5)  # Example input tensor with shape (batch_size, channels, height, width)
 
-# Trace the module to get the GraphModule
+input_tensor = torch.randn(1, 1, 5, 5)  
+
+
 gm = fx.symbolic_trace(net)
 
-# Print the GraphModule
 
-# Inspect the graph to extract input tensor name, weights, and biases
 for node in gm.graph.nodes:
     print(f"Node op: {node.op}, name: {node.name}, target: {node.target}, args: {node.args}, kwargs: {node.kwargs}")
 
